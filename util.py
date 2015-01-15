@@ -5,6 +5,21 @@ import cv2
 import math
 import numpy as np
 
+def chunks_of_size_n(iterator, n):
+    "Split a generator into lists each of size n"
+
+    def chunk():
+        for i in range(n):
+            yield next(iterator)
+
+    while True:
+        curr_chunk = list(chunk())
+        if curr_chunk:
+            yield curr_chunk
+        else:
+            raise StopIteration
+
+
 def tile(tiles, desired_aspect=1.):
     """Return a canvas from tiling 2D images of the same size
 
