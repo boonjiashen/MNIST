@@ -45,17 +45,32 @@ if __name__ == "__main__":
 
     # Reshape them into 2D images
     w = int(X.shape[1]**.5); digit_size = (w, w)
-    indices = random.sample(range(len(X)), sample_size)
-    #indices = range(len(X))
-    digits = (X[ind].reshape(digit_size) for ind in indices)
+    digits = X.reshape(len(X), digit_size[0], -1)
 
     # Create patches
-    patch_size = tuple(15 for _ in range(2))
-    patches = (patch
-            for digit in digits
-            for patch in extract_patches_2d(digit, patch_size, max_patches=10))
+    patch_size = (8, 8)
+    patch_squares = np.vstack(
+            extract_patches_2d(digit, patch_size, max_patches=10)
+            for digit in digits)
+    logging.info('Generated {0} patches of size {1}'.format(
+        len(patch_squares), str(patch_size)))
 
-    dic = sklearn.cluster.MiniBatchKMeans(n_clusters=100, verbose=True)
+    # Reshape each patch into one row vector
+    patch_rows = patch_squares.reshape(len(patch_squares), -1)
+
+
+    ########################## Train clustering algorithm ##################### 
+
+    # Define dictionary learner
+    dic_kwargs = {'n_clusters': 100}
+    dic = sklearn.cluster.KMeans(**dic_kwargs)
+    for key, value in dic_kwargs.items():
+        logging.info('Dictionary {0} = {1}'.format(key, value))
+
+    # Train
+    logging.info('Fitting %i patches', len(patch_rows))
+    dic.fit(patch_rows)
+    logging.info('done')
 
     def display_components(V):
         plt.figure()
@@ -65,13 +80,6 @@ if __name__ == "__main__":
         canvas = util.tile(patches)
         #plt.imshow(canvas, interpolation='nearest', cmap=cm.gray)
         plt.imshow(canvas, interpolation='nearest')
-
-    batch_size = 1000
-    for curr_patches in util.chunks_of_size_n(patches, batch_size):
-        data = np.vstack([patch.ravel() for patch in curr_patches])
-        data -= np.mean(data, axis=0)
-        data /= np.std(data, axis=0)
-        dic.partial_fit(data)
 
     display_components(dic.cluster_centers_)
     plt.show()
