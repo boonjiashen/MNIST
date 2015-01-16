@@ -47,13 +47,15 @@ if __name__ == "__main__":
     whiten_kwargs = {'whiten':True, 'copy':True}
     whitener = sklearn.decomposition.PCA(**whiten_kwargs)
     for key, value in whiten_kwargs.items():
-        logging.info('Whitening kwarg, {0} = {1}'.format(key, value))
+        logging.info('{} {} = {}'.format(whitener.__class__.__name__, key, value))
 
     # Define dictionary learner
-    dic_kwargs = {'n_clusters': 100}
-    dic = sklearn.cluster.KMeans(**dic_kwargs)
+    dic_kwargs = {'n_clusters': 100,
+            #'n_jobs': -1,
+            }
+    dic = sklearn.cluster.MiniBatchKMeans(**dic_kwargs)
     for key, value in dic_kwargs.items():
-        logging.info('Dictionary kwarg, {0} = {1}'.format(key, value))
+        logging.info('{} {} = {}'.format(dic.__class__.__name__, key, value))
 
 
     ############################# Generate patches from MNIST #################
@@ -112,7 +114,7 @@ if __name__ == "__main__":
         plt.xticks(())
         plt.yticks(())
 
-    plt.suptitle('Atoms of dictionary learnt from %i patches' %  \
-            len(patch_rows))
+    plt.suptitle('Atoms of dictionary learnt from %i patches by %s' %  \
+            (len(patch_rows), dic.__class__.__name__))
 
     plt.show()
