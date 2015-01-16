@@ -22,6 +22,62 @@ import sklearn.pipeline
 import sklearn.feature_extraction.image as image
 import sklearn.base
 
+class Encoder(sklearn.base.BaseEstimator,
+        sklearn.base.TransformerMixin):
+    """Encodes patches of a list of images.
+    
+    We use this class to ensapsulate all the messy reshaping issues.
+
+    Transforms (n_samples, n_patches_per_sample, n_patch_features) ->
+    (n_samples, n_patches_per_sample, code_length_per_patch)
+    """
+
+    def __init__(self, coder):
+        """`coder` has a transform method that encodes a
+        (n_signals, n_features) -> (n_components, n_features)
+        """
+        self.coder = coder
+
+    def transform(self, X):
+        # `patch_rows` is a (n_patches_per_sample, n_patch_features) matrix
+        digits_as_patch_rows = X
+        return np.array([
+            self.coder.transform(patch_rows)
+            for patch_rows in digits_as_patch_rows])
+
+
+class PatchExtractor(sklearn.base.BaseEstimator,
+        sklearn.base.TransformerMixin):
+    """Extract patches for images while maintaining a dimension for images.
+
+    We use this class to ensapsulate all the messy reshaping issues.
+
+    Transforms (n_samples, image_height, image_width) to
+    (n_samples, n_patches_per_sample, n_patch_features)
+    """
+
+    def __init__(self, patch_size):
+        self.patch_size = patch_size
+        self.patchifier = image.PatchExtractor(patch_size)
+
+    def transform(self, digit_squares):
+        # (n_samples, image_height, image_width) ->
+        # (n_patches, patch_height, patch_width)
+        patch_squares = self.patchifier.transform(digit_squares)
+
+        logging.debug(patch_squares.shape)
+
+        # (n_patches, patch_height, patch_width) ->
+        # (n_samples, n_patches_per_image, patch_height, patch_width)
+        n_samples = len(digit_squares)
+        n_patches_per_sample = len(patch_squares) / n_samples
+        digits_as_patch_rows = patch_squares.reshape(
+                n_samples, n_patches_per_sample, -1)
+
+        logging.debug(digits_as_patch_rows.shape)
+
+        return digits_as_patch_rows
+
 if __name__ == "__main__":
 
     # Set logging parameters
@@ -63,40 +119,9 @@ if __name__ == "__main__":
 
     ######################### Extract patches from one image ##################
 
-    class PatchExtractor(sklearn.base.BaseEstimator,
-            sklearn.base.TransformerMixin):
-        """Transforms (n_samples, image_height, image_width) to
-        (n_samples, n_patches_per_sample, n_patch_features)
-        """
-
-        def __init__(self, patch_size):
-            self.patch_size = patch_size
-            self.patchifier = image.PatchExtractor(patch_size)
-
-        def fit(self, *args):
-            return self
-
-        def transform(self, digit_squares):
-            # (n_samples, image_height, image_width) ->
-            # (n_patches, patch_height, patch_width)
-            patch_squares = self.patchifier.transform(digit_squares)
-
-            logging.debug(patch_squares.shape)
-
-            # (n_patches, patch_height, patch_width) ->
-            # (n_samples, n_patches_per_image, patch_height, patch_width)
-            n_samples = len(digit_squares)
-            n_patches_per_sample = len(patch_squares) / n_samples
-            digits_as_patch_rows = patch_squares.reshape(
-                    n_samples, n_patches_per_sample, -1)
-
-            logging.debug(digits_as_patch_rows.shape)
-
-            return digits_as_patch_rows
-
     # Define pipeline
     patchifier = PatchExtractor(patch_size)
-    coder = sklearn.decomposition.SparseCoder(dictionary)
+    coder = Encoder(sklearn.decomposition.SparseCoder(dictionary))
 
     # Generate inputs
     digit_rows = X[[0, 12], :]
@@ -106,9 +131,7 @@ if __name__ == "__main__":
     digits_as_patch_rows = patchifier.transform(digit_squares)
 
     # Encode each patch
-    digits_as_patch_codes = np.array([
-        coder.transform(patch_rows)
-        for patch_rows in digits_as_patch_rows])
+    digits_as_patch_codes = coder.transform(digits_as_patch_rows)
     print(digits_as_patch_rows.shape)
     print(digits_as_patch_codes.shape)
 
