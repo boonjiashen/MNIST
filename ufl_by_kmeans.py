@@ -11,6 +11,7 @@ import logging
 import itertools
 import argparse
 import CoatesScaler
+import ZCA
 
 import sklearn.datasets
 import sklearn.cluster
@@ -50,6 +51,7 @@ if __name__ == "__main__":
     pca = (sklearn.decomposition.PCA,
             {'whiten':True, 'copy':True}
             )
+    zca = (ZCA.ZCA, {})
     mbkmeans = (sklearn.cluster.MiniBatchKMeans,
             {
                 'n_clusters': 100,
@@ -64,7 +66,7 @@ if __name__ == "__main__":
             })
 
     # Define pipeline
-    steps = [coates_scaler, pca, kmeans]
+    steps = [coates_scaler, zca, kmeans]
     pipeline = sklearn.pipeline.make_pipeline(
             *[fun(**kwargs) for fun, kwargs in steps])
 
@@ -124,7 +126,8 @@ if __name__ == "__main__":
 
     # Inverse whiten atoms of dictionary
     atom_rows = dic.cluster_centers_ 
-    atom_rows = whitener.inverse_transform(atom_rows)  
+    if hasattr(whitener, 'inverse_transform'):
+        atom_rows = whitener.inverse_transform(atom_rows)  
 
     # Reshape to square
     atom_squares = atom_rows.reshape(len(atom_rows), patch_size[0], -1)
