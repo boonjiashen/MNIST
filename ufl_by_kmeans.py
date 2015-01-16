@@ -10,6 +10,7 @@ import numpy as np
 import logging
 import itertools
 import argparse
+import CoatesScaler
 
 import sklearn.datasets
 import sklearn.cluster
@@ -44,7 +45,8 @@ if __name__ == "__main__":
 
     ############################# Define pipeline #############################    
 
-    scale = (sklearn.preprocessing.StandardScaler, {})
+    std_scaler = (sklearn.preprocessing.StandardScaler, {})
+    coates_scaler = (CoatesScaler.CoatesScaler, {})
     pca = (sklearn.decomposition.PCA,
             {'whiten':True, 'copy':True}
             )
@@ -62,7 +64,7 @@ if __name__ == "__main__":
             })
 
     # Define pipeline
-    steps = [scale, pca, kmeans]
+    steps = [coates_scaler, pca, kmeans]
     pipeline = sklearn.pipeline.make_pipeline(
             *[fun(**kwargs) for fun, kwargs in steps])
 
@@ -70,12 +72,25 @@ if __name__ == "__main__":
     whitener = pipeline.steps[1][1]  # second step
     dic = pipeline.steps[-1][1]  # last step
 
-    # Print kwargs of each step in pipeline
-    for class_object, kwargs in steps:
-        for key, value in kwargs.items():
-            width = max(map(len, kwargs.keys()))
+    # Print steps and respective kwargs in pipeline
+    for si, (class_object, kwargs) in enumerate(steps, 1):
+        if not kwargs:
+            logging.info('{}) {}'.format(si, class_object.__name__))
+            continue
+
+        # Width of kwarg keyword, to make sure they right-justify
+        width = max(map(len, kwargs.keys()))
+
+        for ki, (key, value) in enumerate(kwargs.items()):
             fmt = '{} {:>%i} = {}' % width
-            logging.info(fmt.format(class_object.__name__, key, value))
+            info = fmt.format(class_object.__name__, key, value)
+
+            # Add step index (or blank space to maintain column format)
+            if ki == 0:
+                info = '{}) '.format(si) + info
+            else:
+                info = '   ' + info
+            logging.info(info)
 
 
     ############################# Generate patches from MNIST #################
