@@ -22,6 +22,38 @@ import sklearn.pipeline
 import sklearn.feature_extraction.image as image
 import sklearn.base
 
+
+class MaxPool(sklearn.base.BaseEstimator,
+        sklearn.base.TransformerMixin):
+    """Max pooling on a list of images
+
+    Transforms (n_samples, height, width, n_channels) ->
+    (n_samples, height/2, width/2, n_channels) where each 2x2 cell is
+    reduced to the maximum value in the cell
+    """
+
+    def _max_pool(self, im):
+        """`im` is a (height, width, n_channels) matrix
+
+        We reduce it to (height/2, width/2, n_channels) where each 2x2 cell is
+        reduced to the maximum value in the cell
+        """
+        h, w = im.shape[:2]
+        assert h%2==0 and w%2==0, "Illegal image dimensions"
+
+        tl = im[::2, ::2]
+        tr = im[::2, 1::2]
+        bl = im[1::2, ::2]
+        br = im[1::2, 1::2]
+
+        pool = np.max(np.array([tl, tr, bl, br]), axis=0)
+
+        return pool
+
+    def transform(self, X):
+        return np.array([self._max_pool(x) for x in X])
+
+
 class Encoder(sklearn.base.BaseEstimator,
         sklearn.base.TransformerMixin):
     """Encodes patches of a list of images.
@@ -122,18 +154,48 @@ if __name__ == "__main__":
     # Define pipeline
     patchifier = PatchExtractor(patch_size)
     coder = Encoder(sklearn.decomposition.SparseCoder(dictionary))
+    maxpool = MaxPool()
 
     # Generate inputs
-    digit_rows = X[[0, 12], :]
-    digit_squares = digit_rows.reshape(len(digit_rows), digit_size[0], -1)
+    X_rows = X[[0, 12], :]
+    X_squares = X_rows.reshape(len(X_rows), digit_size[0], -1)
+
+    # Crop digits so that n_patches per dimension is a multiple of 2
+    X_squares = X_squares[:, :27, :27]
 
     # Reshape patch squares to rows to allow sparse coding
-    digits_as_patch_rows = patchifier.transform(digit_squares)
+    X_patch_rows = patchifier.transform(X_squares)
 
     # Encode each patch
-    digits_as_patch_codes = coder.transform(digits_as_patch_rows)
-    print(digits_as_patch_rows.shape)
-    print(digits_as_patch_codes.shape)
+    X_code_rows = coder.transform(X_patch_rows)
+
+    # Reshape patch codes as squares for max pooling
+    n_samples = X_patch_rows.shape[0]
+    w = int(X_patch_rows.shape[1]**.5); patch_grid_size = (w, w)
+    X_code_squares = X_code_rows.reshape(
+            n_samples, patch_grid_size[0], patch_grid_size[0], -1)
+
+    X_code_pool = maxpool.transform(X_code_squares)
+
+    print(X_patch_rows.shape)
+    print(X_code_rows.shape)
+    print(X_code_squares.shape)
+    print(X_code_pool.shape)
+
+    if False:
+        # Display each feature of a single digit
+        code_square = (X_code_squares[0])
+        plt.figure()
+        for channel_n in range(code_square.shape[-1]):
+            plt.subplot(10, 10, channel_n + 1)
+            channel = code_square[:, :, channel_n]
+
+            plt.imshow(channel, cmap=plt.cm.gray, interpolation='nearest')
+            plt.xticks(())
+            plt.yticks(())
+
+        plt.show()
+
 
     ############################## Define pipeline #############################    
 
