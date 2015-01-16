@@ -20,7 +20,7 @@ def chunks_of_size_n(iterator, n):
             raise StopIteration
 
 
-def tile(tiles, desired_aspect=1.):
+def tile(tiles, desired_aspect=1., border_width=0):
     """Return a canvas from tiling 2D images of the same size
 
     Tries to return an image as square as possible.
@@ -73,6 +73,12 @@ def tile(tiles, desired_aspect=1.):
     blank_tile = np.zeros_like(tiles[0])
     tiles.extend([blank_tile for i in range(np.prod(tiling_factor) - n_tiles)])
 
+    # Add borders
+    if border_width != 0:
+        tiles = [np.pad(tile, ((0, border_width), (0, border_width)),
+                mode='constant')
+                for tile in tiles]
+
     # Tile tiles
     rows = [np.hstack(tiles[i:i+tiling_factor[1]])
         for i in range(0, len(tiles), tiling_factor[1])]
@@ -112,6 +118,7 @@ def demo_tile():
     cv2.imshow('1', canvas)
     cv2.waitKey()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     demo = demo_tile
