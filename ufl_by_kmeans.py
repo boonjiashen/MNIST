@@ -13,7 +13,8 @@ import argparse
 
 import sklearn.datasets
 import sklearn.cluster
-from sklearn.decomposition import MiniBatchDictionaryLearning
+import sklearn.preprocessing
+import sklearn.decomposition
 from sklearn.feature_extraction.image import extract_patches_2d
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d
 
@@ -34,14 +35,28 @@ if __name__ == "__main__":
     X = data.data  # (n_examples, n_features)
     y = data.target  # (n_examples)
 
-
-    ############################# Generate patches from MNIST #################
-
     # Randomly sample a subset of the data
     sample_size = int(args.data_proportion * len(X))
     inds = random.sample(range(len(X)), sample_size)
     X, y = X[inds], y[inds]
     logging.info('Sampled %.1f%% of MNIST dataset', 100 * args.data_proportion)
+
+    ############################# Define pipeline #############################    
+
+    # Define whitener
+    whiten_kwargs = {'whiten':True, 'copy':True}
+    whitener = sklearn.decomposition.PCA(**whiten_kwargs)
+    for key, value in whiten_kwargs.items():
+        logging.info('Whitening kwarg, {0} = {1}'.format(key, value))
+
+    # Define dictionary learner
+    dic_kwargs = {'n_clusters': 100}
+    dic = sklearn.cluster.KMeans(**dic_kwargs)
+    for key, value in dic_kwargs.items():
+        logging.info('Dictionary kwarg, {0} = {1}'.format(key, value))
+
+
+    ############################# Generate patches from MNIST #################
 
     # Reshape them into 2D images
     w = int(X.shape[1]**.5); digit_size = (w, w)
@@ -59,27 +74,42 @@ if __name__ == "__main__":
     patch_rows = patch_squares.reshape(len(patch_squares), -1)
 
 
-    ########################## Train clustering algorithm ##################### 
+    ######################### Pre-processing ##################################
 
-    # Define dictionary learner
-    dic_kwargs = {'n_clusters': 100}
-    dic = sklearn.cluster.KMeans(**dic_kwargs)
-    for key, value in dic_kwargs.items():
-        logging.info('Dictionary {0} = {1}'.format(key, value))
+    logging.info('Pre-processing')
+
+    # Feature normalization
+    patch_rows = patch_rows.astype(float)  # Cast as float (required by scale())
+    patch_rows = sklearn.preprocessing.scale(patch_rows)
+
+    # Whiten dataset
+    patch_rows = whitener.fit_transform(patch_rows)
+
+    logging.info('Done')
+
+
+    ########################## Train clustering algorithm ##################### 
 
     # Train
     logging.info('Fitting %i patches', len(patch_rows))
     dic.fit(patch_rows)
     logging.info('done')
 
-    def display_components(V):
-        plt.figure()
 
-        patch_width = int(len(V[0])**.5)
-        patches = [row.reshape((patch_width, patch_width)) for row in V]
-        canvas = util.tile(patches)
-        #plt.imshow(canvas, interpolation='nearest', cmap=cm.gray)
-        plt.imshow(canvas, interpolation='nearest')
+    ######################### Display atoms of dictionary #####################
 
-    display_components(dic.cluster_centers_)
+    # Inverse whiten atoms of dictionary
+    atom_rows = dic.cluster_centers_ 
+    atom_rows = whitener.inverse_transform(atom_rows)  
+
+    # Reshape to square
+    atom_squares = atom_rows.reshape(len(atom_rows), patch_size[0], -1)
+
+    plt.figure()
+    for i, patch in enumerate(atom_squares):
+        plt.subplot(10, 10, i + 1)
+        plt.imshow(patch, cmap=plt.cm.gray, interpolation='nearest')
+        plt.xticks(())
+        plt.yticks(())
+
     plt.show()
