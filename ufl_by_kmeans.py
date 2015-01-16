@@ -112,4 +112,7 @@ if __name__ == "__main__":
         plt.xticks(())
         plt.yticks(())
 
+    plt.suptitle('Atoms of dictionary learnt from %i patches' %  \
+            len(patch_rows))
+
     plt.show()
