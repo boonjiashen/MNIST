@@ -51,7 +51,7 @@ if __name__ == "__main__":
     pca = (sklearn.decomposition.PCA,
             {'whiten':True, 'copy':True}
             )
-    zca = (ZCA.ZCA, {})
+    zca = (ZCA.ZCA, {'regularization': .1})
     mbkmeans = (sklearn.cluster.MiniBatchKMeans,
             {
                 'n_clusters': 100,
