@@ -15,6 +15,7 @@ import sklearn.datasets
 import sklearn.cluster
 import sklearn.preprocessing
 import sklearn.decomposition
+import sklearn.pipeline
 from sklearn.feature_extraction.image import extract_patches_2d
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d
 
@@ -43,33 +44,36 @@ if __name__ == "__main__":
 
     ############################# Define pipeline #############################    
 
+    scale = (sklearn.preprocessing.StandardScaler, {})
     pca = (sklearn.decomposition.PCA,
             {'whiten':True, 'copy':True}
             )
-
     mbkmeans = (sklearn.cluster.MiniBatchKMeans,
             {
                 'n_clusters': 100,
                 'batch_size': 3000,
             })
-
     kmeans = (sklearn.cluster.KMeans,
             {
                 'n_clusters': 100,
-                'n_jobs': -1,
+                #'n_jobs': -1,
                 'n_init': 1,
                 'max_iter': 10,
             })
 
     # Define pipeline
-    dic = kmeans[0](**kmeans[1])
-    whitener = pca[0](**pca[1])
-    pipeline = [pca, kmeans]
+    steps = [scale, pca, kmeans]
+    pipeline = sklearn.pipeline.make_pipeline(
+            *[fun(**kwargs) for fun, kwargs in steps])
 
-    # Print kwargs of each item in pipeline
-    for class_object, kwargs in pipeline:
-        width = max(map(len, kwargs.keys()))
+    # Define pointers to certain steps for future processing
+    whitener = pipeline.steps[1][1]  # second step
+    dic = pipeline.steps[-1][1]  # last step
+
+    # Print kwargs of each step in pipeline
+    for class_object, kwargs in steps:
         for key, value in kwargs.items():
+            width = max(map(len, kwargs.keys()))
             fmt = '{} {:>%i} = {}' % width
             logging.info(fmt.format(class_object.__name__, key, value))
 
@@ -92,29 +96,16 @@ if __name__ == "__main__":
     patch_rows = patch_squares.reshape(len(patch_squares), -1)
 
 
-    ######################### Pre-processing ##################################
+    ######################### Train pipeline ##################################
 
-    logging.info('Pre-processing')
-
-    # Feature normalization
-    patch_rows = patch_rows.astype(float)  # Cast as float (required by scale())
-    patch_rows = sklearn.preprocessing.scale(patch_rows)
-
-    # Whiten dataset
-    patch_rows = whitener.fit_transform(patch_rows)
-
-    logging.info('Done')
-
-
-    ########################## Train clustering algorithm ##################### 
-
-    # Train
-    logging.info('Fitting %i patches', len(patch_rows))
-    dic.fit(patch_rows)
-    logging.info('done')
+    logging.info('Training model...')
+    pipeline.fit(patch_rows.astype(float))
+    logging.info('done.')
 
 
     ######################### Display atoms of dictionary #####################
+
+    logging.info('Displaying atoms of dictionary')
 
     # Inverse whiten atoms of dictionary
     atom_rows = dic.cluster_centers_ 
