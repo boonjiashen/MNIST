@@ -43,19 +43,35 @@ if __name__ == "__main__":
 
     ############################# Define pipeline #############################    
 
-    # Define whitener
-    whiten_kwargs = {'whiten':True, 'copy':True}
-    whitener = sklearn.decomposition.PCA(**whiten_kwargs)
-    for key, value in whiten_kwargs.items():
-        logging.info('{} {} = {}'.format(whitener.__class__.__name__, key, value))
+    pca = (sklearn.decomposition.PCA,
+            {'whiten':True, 'copy':True}
+            )
 
-    # Define dictionary learner
-    dic_kwargs = {'n_clusters': 100,
-            #'n_jobs': -1,
-            }
-    dic = sklearn.cluster.MiniBatchKMeans(**dic_kwargs)
-    for key, value in dic_kwargs.items():
-        logging.info('{} {} = {}'.format(dic.__class__.__name__, key, value))
+    mbkmeans = (sklearn.cluster.MiniBatchKMeans,
+            {
+                'n_clusters': 100,
+                'batch_size': 3000,
+            })
+
+    kmeans = (sklearn.cluster.KMeans,
+            {
+                'n_clusters': 100,
+                'n_jobs': -1,
+                'n_init': 1,
+                'max_iter': 10,
+            })
+
+    # Define pipeline
+    dic = kmeans[0](**kmeans[1])
+    whitener = pca[0](**pca[1])
+    pipeline = [pca, kmeans]
+
+    # Print kwargs of each item in pipeline
+    for class_object, kwargs in pipeline:
+        width = max(map(len, kwargs.keys()))
+        for key, value in kwargs.items():
+            fmt = '{} {:>%i} = {}' % width
+            logging.info(fmt.format(class_object.__name__, key, value))
 
 
     ############################# Generate patches from MNIST #################
