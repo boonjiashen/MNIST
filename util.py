@@ -1,23 +1,28 @@
 """Useful functions
 """
 
-import cv2
 import math
 import numpy as np
+import logging
 
 def chunks_of_size_n(iterator, n):
-    "Split a generator into lists each of size n"
+    "Generators generators each of size n"
 
     def chunk():
-        for i in range(n):
+        yield next_item
+        for _ in range(n - 1):
             yield next(iterator)
 
+    if not hasattr(iterator, '__iter__'):
+        raise IOError('argument is not an iterator')
+    else:
+        iterator = iter(iterator)
     while True:
-        curr_chunk = list(chunk())
-        if curr_chunk:
-            yield curr_chunk
-        else:
-            raise StopIteration
+        try:
+            next_item = next(iterator)
+            yield chunk()
+        except StopIteration:
+            return
 
 
 def tile(tiles, desired_aspect=1., border_width=0):
@@ -93,6 +98,7 @@ def demo_tile():
     Instructions: press ESC to exit
     """
 
+    import cv2
     import itertools
     import argparse
 
@@ -120,7 +126,16 @@ def demo_tile():
     cv2.destroyAllWindows()
 
 
+def example_chunks_of_size_n():
+    """Example of chunks_of_size_n()"""
+
+    import itertools
+    iterator = range(10)
+    for items in chunks_of_size_n(iterator, 3):
+        print(list(items))
+
+
 if __name__ == "__main__":
-    demo = demo_tile
-    print(demo.__doc__)
-    demo()
+    example = example_chunks_of_size_n
+    print(example.__name__)
+    example()
