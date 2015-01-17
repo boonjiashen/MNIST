@@ -22,6 +22,35 @@ import sklearn.pipeline
 from sklearn.feature_extraction.image import extract_patches_2d
 from sklearn.feature_extraction.image import reconstruct_from_patches_2d
 
+def print_steps(steps, printer=logging.info):
+    """Pretty-print steps of a pipeline
+
+    `steps` is a list of (class_object, dict) tuples
+
+    `printer` is the function used to print
+    """
+
+    # Print steps and respective kwargs in pipeline
+    for si, (class_object, kwargs) in enumerate(steps, 1):
+        if not kwargs:
+            printer('{}) {}'.format(si, class_object.__name__))
+            continue
+
+        # Width of kwarg keyword, to make sure they right-justify
+        width = max(map(len, kwargs.keys()))
+
+        for ki, (key, value) in enumerate(kwargs.items()):
+            fmt = '{} {:>%i} = {}' % width
+            info = fmt.format(class_object.__name__, key, value)
+
+            # Add step index (or blank space to maintain column format)
+            if ki == 0:
+                info = '{}) '.format(si) + info
+            else:
+                info = '   ' + info
+            printer(info)
+
+
 if __name__ == "__main__":
 
     # Set logging parameters
@@ -77,26 +106,7 @@ if __name__ == "__main__":
     whitener = pipeline.steps[1][1]  # second step
     dic = pipeline.steps[-1][1]  # last step
 
-    # Print steps and respective kwargs in pipeline
-    for si, (class_object, kwargs) in enumerate(steps, 1):
-        if not kwargs:
-            logging.info('{}) {}'.format(si, class_object.__name__))
-            continue
-
-        # Width of kwarg keyword, to make sure they right-justify
-        width = max(map(len, kwargs.keys()))
-
-        for ki, (key, value) in enumerate(kwargs.items()):
-            fmt = '{} {:>%i} = {}' % width
-            info = fmt.format(class_object.__name__, key, value)
-
-            # Add step index (or blank space to maintain column format)
-            if ki == 0:
-                info = '{}) '.format(si) + info
-            else:
-                info = '   ' + info
-            logging.info(info)
-
+    print_steps(steps)
 
     ############################# Generate patches from MNIST #################
 
