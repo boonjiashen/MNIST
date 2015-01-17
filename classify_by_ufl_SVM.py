@@ -9,17 +9,19 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import random
-import util
 import time
 import numpy as np
 import logging
 import itertools
 import argparse
+import pickle
+
 import CoatesScaler
 import ZCA
 import PatchExtractor
 import MaxPool
 import Encoder
+import util
 
 import sklearn.datasets
 import sklearn.cluster
@@ -40,6 +42,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("data_proportion", nargs='?', type=float, default=1.,
             help="Proportion of full MNIST dataset to be used")
+    parser.add_argument("--input_pickle", type=str,
+            help="File to unpickle dictionary from (default: populate dictionary with random patches")
     args = parser.parse_args()
 
     # Load MNIST digits
@@ -49,24 +53,35 @@ if __name__ == "__main__":
 
     X = X.astype(float)
 
+    # Get size of a digit image
+    w = int(X.shape[1]**.5); digit_size = (w, w)
 
     ############################# Generate dictionary from random patches #####
 
-    # Reshape sample of digits into 2D images
-    n_atoms = 100
-    w = int(X.shape[1]**.5); digit_size = (w, w)
-    digit_squares = (X[i].reshape(digit_size)
-            for i in random.sample(range(len(X)), n_atoms))
+    if args.input_pickle is None:
 
-    # Grab one random patch from each digit
-    patch_size = (8, 8)
-    patch_squares = np.vstack(
-            image.extract_patches_2d(digit, patch_size, max_patches=1)
-            for digit in digit_squares
-            )
+        # Reshape sample of digits into 2D images
+        n_atoms = 100
+        digit_squares = (X[i].reshape(digit_size)
+                for i in random.sample(range(len(X)), n_atoms))
 
-    # Flatten patch squares to (n_components, n_features)
-    dictionary = patch_squares.reshape(len(patch_squares), -1)
+        # Grab one random patch from each digit
+        patch_size = (8, 8)
+        patch_squares = np.vstack(
+                image.extract_patches_2d(digit, patch_size, max_patches=1)
+                for digit in digit_squares
+                )
+
+        # Flatten patch squares to (n_components, n_features)
+        dictionary = patch_squares.reshape(len(patch_squares), -1)
+
+    else:
+
+        with open(args.input_pickle, 'rb') as fid:
+            dictionary = pickle.load(fid)
+
+        n_atoms = dictionary.shape[0]
+        w = int(dictionary.shape[1]**.5); patch_size = (w, w)
 
 
     ######################### Extract patches from one image ##################
@@ -79,7 +94,7 @@ if __name__ == "__main__":
 
     # Generate inputs
     n_samples = int(len(X) * args.data_proportion)
-    X_rows = X[:n_samples, :]
+    X_rows = X[random.sample(range(len(X)), n_samples), :]
     X_squares = X_rows.reshape(len(X_rows), digit_size[0], -1)
 
     # Crop digits so that n_patches per dimension is a multiple of 2
@@ -114,16 +129,20 @@ if __name__ == "__main__":
     logging.info(X_code_pool.shape)
     logging.info(X_code_pool_rows.shape)
 
-    if False:
+    if True:
         # Display each feature of a single digit
-        code_square = (X_code_squares[0])
-        plt.figure()
-        for channel_n in range(code_square.shape[-1]):
-            plt.subplot(10, 10, channel_n + 1)
-            channel = code_square[:, :, channel_n]
+        n_displays = 5
+        inds = random.sample(range(len(X_code_squares)), n_displays)
+        code_squares = X_code_squares[inds]
+        for i, code_square in enumerate(code_squares, 1):
+            logging.info('Displaying code example %i', i)
+            plt.figure()
+            for channel_n in range(code_square.shape[-1]):
+                plt.subplot(10, 10, channel_n + 1)
+                channel = code_square[:, :, channel_n]
 
-            plt.imshow(channel, cmap=plt.cm.gray, interpolation='nearest')
-            plt.xticks(())
-            plt.yticks(())
+                plt.imshow(channel, cmap=plt.cm.gray, interpolation='nearest')
+                plt.xticks(())
+                plt.yticks(())
 
         plt.show()
