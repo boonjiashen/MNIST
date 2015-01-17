@@ -12,6 +12,7 @@ import itertools
 import argparse
 import CoatesScaler
 import ZCA
+import pickle
 
 import sklearn.datasets
 import sklearn.cluster
@@ -31,6 +32,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("data_proportion", nargs='?', type=float, default=1.,
             help="Proportion of full MNIST dataset to be used")
+    parser.add_argument("--output_pickle", type=str,
+            help="Filename to pickle (n_components, n_features)-sized dictionary into")
     args = parser.parse_args()
 
     # Load MNIST digits
@@ -143,3 +146,14 @@ if __name__ == "__main__":
             (len(patch_rows), dic.__class__.__name__))
 
     plt.show()
+
+
+    ######################### Pickle dictionary if required ###################
+    
+    atom_rows = dic.cluster_centers_ 
+    if args.output_pickle is not None:
+        with open(args.output_pickle, 'wb') as fid:
+            pickle.dump(atom_rows, fid)
+
+        logging.info('Pickled %s-sized dictionary into %s',
+                str(atom_rows.shape), args.output_pickle)
