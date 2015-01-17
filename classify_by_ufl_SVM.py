@@ -87,47 +87,58 @@ if __name__ == "__main__":
     ######################### Extract patches from one image ##################
 
     # Define pipeline
+    coates_scaler = CoatesScaler.CoatesScaler()
+    zca = ZCA.ZCA(regularization=.1)
     patchifier = PatchExtractor.PatchExtractor(patch_size)
-    coder = Encoder.Encoder(sklearn.decomposition.SparseCoder(dictionary,
-        transform_algorithm='threshold'))
+    patch_coder = sklearn.decomposition.SparseCoder(dictionary)
+    digit_coder = Encoder.Encoder(patch_coder)
     maxpool = MaxPool.MaxPool()
 
     # Generate inputs
     n_samples = int(len(X) * args.data_proportion)
     X_rows = X[random.sample(range(len(X)), n_samples), :]
+
     X_squares = X_rows.reshape(len(X_rows), digit_size[0], -1)
 
     # Crop digits so that n_patches per dimension is a multiple of 2
     X_squares = X_squares[:, :27, :27]
 
-    logging.info('Transforming %i samples', len(X_rows))
-    logging.info('Creating patches...')
+    logging.info('Transforming %i digits from MNIST', len(X_rows))
 
-    # Reshape patch squares to rows to allow sparse coding
-    X_patch_rows = patchifier.transform(X_squares)
+    patch_squares = np.vstack(
+            image.extract_patches_2d(digit, patch_size)
+            for digit in X_squares)
+    logging.info('Generated {0} patches of size {1}'.format(
+        len(patch_squares), str(patch_size)))
+
+    # Reshape each patch into one row vector (n_patches, numel_per_patch)
+    patch_rows = patch_squares.reshape(len(patch_squares), -1)
+
+    logging.info('Feature normalization and whitening...')
+
+    # Feature normalization, whitening
+    tmp = patch_rows
+    tmp = coates_scaler.fit(tmp).transform(tmp)
+    tmp = zca.fit(tmp).transform(tmp)
+    patch_rows = tmp
 
     logging.info('Encoding patches...')
 
-    # Encode each patch
-    X_code_rows = coder.transform(X_patch_rows)
-
-    # Reshape patch codes as squares for max pooling
-    n_samples = X_patch_rows.shape[0]
-    w = int(X_patch_rows.shape[1]**.5); patch_grid_size = (w, w)
-    X_code_squares = X_code_rows.reshape(
-            n_samples, patch_grid_size[0], patch_grid_size[0], -1)
+    # Encode patches into codes (n_codes, n_atoms)-shape
+    codes = patch_coder.transform(patch_rows)
 
     logging.info('Max pooling...')
 
+    # Reshape codes as squares for max pooling
+    n_samples = len(X_rows)
+    patch_grid_width = (len(patch_rows) // n_samples)**.5
+    X_code_squares = codes.reshape(
+            n_samples, patch_grid_width, patch_grid_width, -1)
+
+    # Perform max-pooling
     X_code_pool = maxpool.transform(X_code_squares)
 
     X_code_pool_rows = X_code_pool.reshape(len(X_code_pool), -1)
-
-    logging.info(X_patch_rows.shape)
-    logging.info(X_code_rows.shape)
-    logging.info(X_code_squares.shape)
-    logging.info(X_code_pool.shape)
-    logging.info(X_code_pool_rows.shape)
 
     if True:
         # Display each feature of a single digit
