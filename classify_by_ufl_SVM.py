@@ -31,6 +31,8 @@ import sklearn.decomposition
 import sklearn.pipeline
 import sklearn.feature_extraction.image as image
 import sklearn.base
+import sklearn.svm
+import sklearn.cross_validation
 
 def to_transformer_class(fun):
     """Turns a function into an sklearn transformer class with the function
@@ -63,13 +65,13 @@ if __name__ == "__main__":
 
     # Load MNIST digits
     data = sklearn.datasets.fetch_mldata('MNIST original')
-    X = data.data  # (n_examples, n_features)
-    y = data.target  # (n_examples)
+    all_digits = data.data  # (n_examples, n_features)
+    all_targets = data.target  # (n_examples)
 
-    X = X.astype(float)
+    all_digits = all_digits.astype(float)
 
     # Get size of a digit image
-    w = int(X.shape[1]**.5); digit_size = (w, w)
+    w = int(all_digits.shape[1]**.5); digit_size = (w, w)
 
     ############################# Generate dictionary from random patches #####
 
@@ -149,11 +151,14 @@ if __name__ == "__main__":
 
 
 
-    ######################### Extract patches #################################
+    ######################### Sample subset of MNIST ##########################
 
-    # Generate inputs
-    n_samples = int(len(X) * args.data_proportion)
-    X_rows = X[random.sample(range(len(X)), n_samples), :]
+    n_samples = int(len(all_digits) * args.data_proportion)
+    inds = random.sample(range(len(all_digits)), n_samples)
+    X_rows, y = all_digits[inds], all_targets[inds]
+
+
+    ######################### Extract patches #################################
 
     X_squares = X_rows.reshape(len(X_rows), digit_size[0], -1)
 
@@ -182,6 +187,32 @@ if __name__ == "__main__":
     logging.info('Encoding patches...')
     processor = sklearn.pipeline.Pipeline(pipeline.steps[2:])
     X_code_pool_rows = processor.transform(whitened_patch_rows)
+
+
+    ######################### Train and test classifier #######################
+
+    clf = sklearn.svm.LinearSVC()
+    train_proportion = .6
+    Xtrain, Xtest, ytrain, ytest = sklearn.cross_validation.train_test_split(
+            X_rows, y, train_size=train_proportion)
+
+    logging.info('Training %s on %i examples',
+            clf.__class__.__name__, len(Xtrain))
+    clf.fit(Xtrain, ytrain)
+
+    logging.info('Testing %s on %i examples',
+            clf.__class__.__name__, len(Xtest))
+    predictions = clf.predict(Xtest)
+
+    # Print performance metrics
+    metrics = 'f1_score', 'accuracy_score', 'precision_score', 'recall_score'
+    for metric_name in metrics:
+        score = getattr(sklearn.metrics, metric_name)(ytest, predictions)
+
+        # Prettify metric name formatting
+        metric_fmt = (('%' + str(max(map(len, metrics))) + 's') % metric_name)
+
+        print(metric_fmt, '=', score)
 
 
     ######################### Display transformed digits ######################
