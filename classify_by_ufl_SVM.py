@@ -45,6 +45,8 @@ if __name__ == "__main__":
             help="Proportion of full MNIST dataset to be used")
     parser.add_argument("--input_pickle", type=str,
             help="File to unpickle dictionary from (default: populate dictionary with random patches")
+    parser.add_argument("--n_display", type=int, default=0,
+            help="Number of output variables to be displayed.")
     args = parser.parse_args()
 
     # Load MNIST digits
@@ -156,20 +158,22 @@ if __name__ == "__main__":
 
     X_code_pool_rows = X_code_pool.reshape(len(X_code_pool), -1)
 
-    if True:
-        # Display each feature of a single digit
-        n_displays = 5
-        inds = random.sample(range(len(X_code_squares)), n_displays)
-        code_pools = X_code_pool[inds]
-        for i, code_square in enumerate(code_pools, 1):
-            logging.info('Displaying code example %i', i)
-            plt.figure()
-            for channel_n in range(code_square.shape[-1]):
-                plt.subplot(10, 10, channel_n + 1)
-                channel = code_square[:, :, channel_n]
 
-                plt.imshow(channel, cmap=plt.cm.gray, interpolation='nearest')
-                plt.xticks(())
-                plt.yticks(())
+    ######################### Display transformed digits ######################
 
-        plt.show()
+    # Display each feature of several digits
+    n_displays = args.n_display
+    inds = random.sample(range(len(X_code_squares)), n_displays)
+    code_pools = X_code_pool[inds]
+    for i, code_square in enumerate(code_pools, 1):
+        logging.info('Displaying code example %i', i)
+        plt.figure()
+        for channel_n in range(code_square.shape[-1]):
+            plt.subplot(10, 10, channel_n + 1)
+            channel = code_square[:, :, channel_n]
+
+            plt.imshow(channel, cmap=plt.cm.gray, interpolation='nearest')
+            plt.xticks(())
+            plt.yticks(())
+
+    plt.show()
