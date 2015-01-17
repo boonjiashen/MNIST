@@ -22,6 +22,7 @@ import PatchExtractor
 import MaxPool
 import Encoder
 import util
+from ufl_by_kmeans import print_steps
 
 import sklearn.datasets
 import sklearn.cluster
@@ -81,18 +82,36 @@ if __name__ == "__main__":
             dictionary = pickle.load(fid)
 
         n_atoms = dictionary.shape[0]
-        w = int(dictionary.shape[1]**.5); patch_size = (w, w)
+
+    # Get patch size (as many elements as atom length)
+    w = int(dictionary.shape[1]**.5); patch_size = (w, w)
 
 
-    ######################### Extract patches from one image ##################
+    ######################### Define pipeline #################################
+
+    patchifier = PatchExtractor.PatchExtractor(patch_size)
+
+    # Define possible steps to pipeline
+    coates_scaler = (CoatesScaler.CoatesScaler, {})
+    zca = (ZCA.ZCA, {'regularization':.1})
+    patch_coder = (sklearn.decomposition.SparseCoder,
+            {
+                'dictionary':dictionary,
+                'transform_algorithm':'threshold',
+                'transform_alpha':0
+            })
 
     # Define pipeline
-    coates_scaler = CoatesScaler.CoatesScaler()
-    zca = ZCA.ZCA(regularization=.1)
-    patchifier = PatchExtractor.PatchExtractor(patch_size)
-    patch_coder = sklearn.decomposition.SparseCoder(dictionary)
-    digit_coder = Encoder.Encoder(patch_coder)
+    steps = [coates_scaler, zca, patch_coder]
+    pipeline = sklearn.pipeline.make_pipeline(
+            *[fun(**kwargs) for fun, kwargs in steps])
+
+    print_steps(steps)
+
     maxpool = MaxPool.MaxPool()
+
+
+    ######################### Extract patches #################################
 
     # Generate inputs
     n_samples = int(len(X) * args.data_proportion)
@@ -114,18 +133,13 @@ if __name__ == "__main__":
     # Reshape each patch into one row vector (n_patches, numel_per_patch)
     patch_rows = patch_squares.reshape(len(patch_squares), -1)
 
-    logging.info('Feature normalization and whitening...')
 
-    # Feature normalization, whitening
-    tmp = patch_rows
-    tmp = coates_scaler.fit(tmp).transform(tmp)
-    tmp = zca.fit(tmp).transform(tmp)
-    patch_rows = tmp
+    ######################### Transformation ##################################
 
-    logging.info('Encoding patches...')
+    logging.info('Pre-processed patches to code')
 
     # Encode patches into codes (n_codes, n_atoms)-shape
-    codes = patch_coder.transform(patch_rows)
+    codes = pipeline.fit_transform(patch_rows)
 
     logging.info('Max pooling...')
 
@@ -142,10 +156,10 @@ if __name__ == "__main__":
 
     if True:
         # Display each feature of a single digit
-        n_displays = 5
+        n_displays = 1
         inds = random.sample(range(len(X_code_squares)), n_displays)
-        code_squares = X_code_squares[inds]
-        for i, code_square in enumerate(code_squares, 1):
+        code_pools = X_code_pool[inds]
+        for i, code_square in enumerate(code_pools, 1):
             logging.info('Displaying code example %i', i)
             plt.figure()
             for channel_n in range(code_square.shape[-1]):
