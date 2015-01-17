@@ -105,14 +105,25 @@ if __name__ == "__main__":
 
     ######################### Define pipeline #################################
 
-    patchifier = PatchExtractor.PatchExtractor(patch_size)
+    patch_step_size = 1
+    Patchifier = to_transformer_class(lambda X:
+                np.array([patch
+                for digit in X
+                for patch in util.yield_windows(digit, patch_size,
+                    (patch_step_size, patch_step_size))])
+                )
+
+    # Find out patch grid width to figure out how to reshape codes into squares
+    digit = all_digits[0].reshape(1, digit_size[0], -1)
+    patches = Patchifier().transform(digit)
+    patch_grid_width = int(len(patches)**.5)
+    logging.info('Patchifier generates %i patches per digit', len(patches))
 
     def squarify_codes(X):
         """Reshapes (n_codes, n_atoms)-shape ->
         (n_samples, grid_width, grid_width, n_atoms)
         """
         n_codes, n_atoms = X.shape
-        patch_grid_width = 20  # TODO find a way not to hard code this
         shape = (-1, patch_grid_width, patch_grid_width, n_atoms)
         logging.info('Squarify codes with shape %s', str(shape))
         return X.reshape(*shape)
@@ -162,16 +173,14 @@ if __name__ == "__main__":
 
     X_squares = X_rows.reshape(len(X_rows), digit_size[0], -1)
 
-    # Crop digits so that n_patches per dimension is a multiple of 2
-    X_squares = X_squares[:, :27, :27]
-
     logging.info('Transforming %i digits from MNIST', len(X_rows))
 
-    patch_squares = np.vstack(
-            image.extract_patches_2d(digit, patch_size)
-            for digit in X_squares)
-    logging.info('Generated {0} patches of size {1}'.format(
-        len(patch_squares), str(patch_size)))
+    patch_squares = Patchifier().transform(X_squares)
+
+    logging.info('Generated {} patches of size {}, {} patches per digit'.format(
+        len(patch_squares),
+        str(patch_size),
+        len(patch_squares) // len(X_squares)))
 
     # Reshape each patch into one row vector (n_patches, numel_per_patch)
     patch_rows = patch_squares.reshape(len(patch_squares), -1)

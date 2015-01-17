@@ -37,13 +37,18 @@ def max_pool(im, step_size=2, chop_tail=True):
     return np.max(np.array(downsamples), axis=0)
 
 
-class MaxPool(sklearn.base.BaseEstimator,
-        sklearn.base.TransformerMixin):
+class MaxPool(sklearn.base.BaseEstimator, sklearn.base.TransformerMixin):
+
+    def __init__(self, cell_width=2):
+        """`cell_width` is the width of the square max-pool cell"""
+        self.cell_width = cell_width
+
     def transform(self, X):
-        return np.array([max_pool(x) for x in X])
+        return np.array([max_pool(x, step_size=self.cell_width) for x in X])
 
 
 if __name__ == '__main__':
+    """Example of max_pool()"""
 
     im = np.random.randint(0, 9, (7, 7))
     print('Target image is\n', im)
