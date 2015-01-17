@@ -32,6 +32,18 @@ import sklearn.pipeline
 import sklearn.feature_extraction.image as image
 import sklearn.base
 
+def to_transformer_class(fun):
+    """Turns a function into an sklearn transformer class with the function
+    as the transform method of the class
+
+    `fun` takes a single argument X and returns the transformation of X
+    """
+    class Transform(sklearn.base.BaseEstimator,
+            sklearn.base.TransformerMixin):
+        def fit(self, X): return self
+        def transform(self, X): return fun(X)
+    return Transform
+
 
 if __name__ == "__main__":
 
@@ -93,6 +105,25 @@ if __name__ == "__main__":
 
     patchifier = PatchExtractor.PatchExtractor(patch_size)
 
+    def squarify_codes(X):
+        """Reshapes (n_codes, n_atoms)-shape ->
+        (n_samples, grid_width, grid_width, n_atoms)
+        """
+        n_codes, n_atoms = X.shape
+        patch_grid_width = 20  # TODO find a way not to hard code this
+        shape = (-1, patch_grid_width, patch_grid_width, n_atoms)
+        logging.info('Squarify codes with shape %s', str(shape))
+        return X.reshape(*shape)
+
+    def flatten_except_axis0(X):
+        """Reshapes (dim0, ...) -> (dim0, dim1)
+        """
+        return X.reshape(len(X), -1)
+
+    # Define ad-hoc transformer classes
+    CodeSquarer = to_transformer_class(squarify_codes)
+    FlattenExceptAxis0 = to_transformer_class(flatten_except_axis0)
+
     # Define possible steps to pipeline
     coates_scaler = (CoatesScaler.CoatesScaler, {})
     zca = (ZCA.ZCA, {'regularization':.1})
@@ -102,16 +133,20 @@ if __name__ == "__main__":
                 'transform_algorithm':'threshold',
                 'transform_alpha':0
             })
+    flattener = (FlattenExceptAxis0, {})
+    code_squarer = (CodeSquarer, {})
+    maxpool = (MaxPool.MaxPool, {})
 
     # Define pipeline
-    steps = [coates_scaler, zca, patch_coder]
-    preprocessor = sklearn.pipeline.make_pipeline(
-            *[fun(**kwargs) for fun, kwargs in steps[:-1]])
-    coder = patch_coder[0](**patch_coder[1])
+    steps = [coates_scaler, zca, patch_coder,
+            code_squarer,
+            maxpool,
+            flattener]
+    pipeline = sklearn.pipeline.make_pipeline(
+            *[fun(**kwargs) for fun, kwargs in steps])
 
     print_steps(steps)
 
-    maxpool = MaxPool.MaxPool()
 
 
     ######################### Extract patches #################################
@@ -140,38 +175,28 @@ if __name__ == "__main__":
     ######################### Transformation ##################################
 
     logging.info('Pre-processing patches...')
+    preprocessor = sklearn.pipeline.Pipeline(pipeline.steps[:2])
     whitened_patch_rows = preprocessor.fit_transform(patch_rows)
 
     # Encode patches into codes (n_codes, n_atoms)-shape
     logging.info('Encoding patches...')
-    codes = coder.transform(whitened_patch_rows)
-
-    # Reshape codes as squares for max pooling
-    logging.info('Max pooling...')
-    n_samples = len(X_rows)
-    patch_grid_width = (len(patch_rows) // n_samples)**.5
-    X_code_squares = codes.reshape(
-            n_samples, patch_grid_width, patch_grid_width, -1)
-
-    # Perform max-pooling
-    X_code_pool = maxpool.transform(X_code_squares)
-
-    X_code_pool_rows = X_code_pool.reshape(len(X_code_pool), -1)
+    processor = sklearn.pipeline.Pipeline(pipeline.steps[2:])
+    X_code_pool_rows = processor.transform(whitened_patch_rows)
 
 
     ######################### Display transformed digits ######################
 
     # Display each feature of several digits
     n_displays = args.n_display
-    inds = random.sample(range(len(X_code_squares)), n_displays)
-    code_pools = X_code_pool[inds]
-    for i, code_square in enumerate(code_pools, 1):
+    examples = random.sample(list(X_code_pool_rows), n_displays)
+    for i, code_pool_row in enumerate(examples, 1):
         logging.info('Displaying code example %i', i)
+        code_pool_square = code_pool_row.reshape(10, 10, -1)
         plt.figure()
-        for channel_n in range(code_square.shape[-1]):
-            plt.subplot(10, 10, channel_n + 1)
-            channel = code_square[:, :, channel_n]
+        for channel_n in range(code_pool_square.shape[-1]):
+            channel = code_pool_square[:, :, channel_n]
 
+            plt.subplot(10, 10, channel_n + 1)
             plt.imshow(channel, cmap=plt.cm.gray, interpolation='nearest')
             plt.xticks(())
             plt.yticks(())
