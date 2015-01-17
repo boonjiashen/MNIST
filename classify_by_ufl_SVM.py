@@ -201,27 +201,15 @@ if __name__ == "__main__":
     ######################### Train and test classifier #######################
 
     clf = sklearn.svm.LinearSVC()
-    train_proportion = .6
-    Xtrain, Xtest, ytrain, ytest = sklearn.cross_validation.train_test_split(
-            X_rows, y, train_size=train_proportion)
 
-    logging.info('Training %s on %i examples',
-            clf.__class__.__name__, len(Xtrain))
-    clf.fit(Xtrain, ytrain)
+    # Get F1 score by KFolds cross validation
+    n_folds = 5
+    f1s = sklearn.cross_validation.cross_val_score(clf, X_rows, y,
+            scoring='f1', cv=n_folds)
+    f1s *= 100
 
-    logging.info('Testing %s on %i examples',
-            clf.__class__.__name__, len(Xtest))
-    predictions = clf.predict(Xtest)
-
-    # Print performance metrics
-    metrics = 'f1_score', 'accuracy_score', 'precision_score', 'recall_score'
-    for metric_name in metrics:
-        score = getattr(sklearn.metrics, metric_name)(ytest, predictions)
-
-        # Prettify metric name formatting
-        metric_fmt = (('%' + str(max(map(len, metrics))) + 's') % metric_name)
-
-        print(metric_fmt, '=', score)
+    print('Over {} folds, f1 = {:.1f}% +/- {:.1f}%'.format(
+        n_folds, np.mean(f1s), np.std(f1s)))
 
 
     ######################### Display transformed digits ######################
