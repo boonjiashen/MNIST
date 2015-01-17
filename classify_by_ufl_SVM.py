@@ -103,8 +103,9 @@ if __name__ == "__main__":
 
     # Define pipeline
     steps = [coates_scaler, zca, patch_coder]
-    pipeline = sklearn.pipeline.make_pipeline(
-            *[fun(**kwargs) for fun, kwargs in steps])
+    preprocessor = sklearn.pipeline.make_pipeline(
+            *[fun(**kwargs) for fun, kwargs in steps[:-1]])
+    coder = patch_coder[0](**patch_coder[1])
 
     print_steps(steps)
 
@@ -136,14 +137,15 @@ if __name__ == "__main__":
 
     ######################### Transformation ##################################
 
-    logging.info('Pre-processed patches to code')
+    logging.info('Pre-processing patches...')
+    whitened_patch_rows = preprocessor.fit_transform(patch_rows)
 
     # Encode patches into codes (n_codes, n_atoms)-shape
-    codes = pipeline.fit_transform(patch_rows)
-
-    logging.info('Max pooling...')
+    logging.info('Encoding patches...')
+    codes = coder.transform(whitened_patch_rows)
 
     # Reshape codes as squares for max pooling
+    logging.info('Max pooling...')
     n_samples = len(X_rows)
     patch_grid_width = (len(patch_rows) // n_samples)**.5
     X_code_squares = codes.reshape(
@@ -156,7 +158,7 @@ if __name__ == "__main__":
 
     if True:
         # Display each feature of a single digit
-        n_displays = 1
+        n_displays = 5
         inds = random.sample(range(len(X_code_squares)), n_displays)
         code_pools = X_code_pool[inds]
         for i, code_square in enumerate(code_pools, 1):
