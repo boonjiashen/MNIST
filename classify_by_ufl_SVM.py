@@ -44,6 +44,7 @@ def to_transformer_class(fun):
             sklearn.base.TransformerMixin):
         def fit(self, X): return self
         def transform(self, X): return fun(X)
+    Transform.__name__ = fun.__name__[0].upper() + fun.__name__[1:]
     return Transform
 
 
@@ -105,7 +106,7 @@ if __name__ == "__main__":
 
     ######################### Define pipeline #################################
 
-    patch_step_size = 1
+    patch_step_size = 2
     Patchifier = to_transformer_class(lambda X:
                 np.array([patch
                 for digit in X
@@ -136,6 +137,9 @@ if __name__ == "__main__":
     # Define ad-hoc transformer classes
     CodeSquarer = to_transformer_class(squarify_codes)
     FlattenExceptAxis0 = to_transformer_class(flatten_except_axis0)
+    RLU = to_transformer_class(lambda X:
+            np.maximum(0, np.dot(X, dictionary.T)))
+    RLU.__name__ = 'RLU'
 
     # Define possible steps to pipeline
     coates_scaler = (CoatesScaler.CoatesScaler, {})
@@ -149,9 +153,10 @@ if __name__ == "__main__":
     flattener = (FlattenExceptAxis0, {})
     code_squarer = (CodeSquarer, {})
     maxpool = (MaxPool.MaxPool, {})
+    rlu = (RLU, {})
 
     # Define pipeline
-    steps = [coates_scaler, zca, patch_coder,
+    steps = [coates_scaler, zca, rlu,
             code_squarer,
             maxpool,
             flattener]
