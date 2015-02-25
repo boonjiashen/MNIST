@@ -53,17 +53,21 @@ def print_steps(steps, printer=logging.info):
 
 if __name__ == "__main__":
 
-    # Set logging parameters
-    logging.basicConfig(level=logging.INFO,
-            format='%(asctime)s %(message)s')
-
     # Parse commandline arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("data_proportion", nargs='?', type=float, default=1.,
             help="Proportion of full MNIST dataset to be used")
     parser.add_argument("--output_pickle", type=str,
             help="Filename to pickle (n_components, n_features)-sized dictionary into")
+    parser.add_argument("--log", type=str, default='INFO',
+            help="Logging setting (e.g., INFO, DEBUG)")
     args = parser.parse_args()
+
+    # Setting logging parameters
+    numeric_level = getattr(logging, args.log.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % loglevel)
+    logging.basicConfig(level=numeric_level, format='%(asctime)s %(message)s')
 
     # Load MNIST digits
     data = sklearn.datasets.fetch_mldata('MNIST original')
