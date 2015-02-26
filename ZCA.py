@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 from scipy import linalg
 from sklearn.utils import array2d, as_float_array
 from sklearn.base import TransformerMixin, BaseEstimator
@@ -11,18 +12,27 @@ class ZCA(BaseEstimator, TransformerMixin):
         self.copy = copy
 
     def fit(self, X, y=None):
+
         X = array2d(X)
         X = as_float_array(X, copy = self.copy)
-        self.mean_ = np.mean(X, axis=0)
-        X -= self.mean_
-        sigma = np.dot(X.T,X) / X.shape[1]
-        U, S, V = linalg.svd(sigma)
-        tmp = np.dot(U, np.diag(1/np.sqrt(S+self.regularization)))
-        self.components_ = np.dot(tmp, U.T)
+        cov = np.dot(X.T,X) / X.shape[1]
+        V, D, _ = np.linalg.svd(cov)  # eigenvalues, eigenvectors
+
+        # new_x = V * (D + epsilon * I)^.5 * V.T * x
+        # where (.) is a diagonal matrix and ^.5 is presumably an element-wise
+        # operation, x is a column vector
+        self.components_  = np.dot(np.dot(V, np.diag((D + self.regularization)**-.5)),
+                V.T)
+
         return self
 
     def transform(self, X):
-        X = array2d(X)
-        X_transformed = X - self.mean_
-        X_transformed = np.dot(X_transformed, self.components_.T)
-        return X_transformed
+        #X = array2d(X)
+        #X_transformed = X - self.mean_
+        #X_transformed = np.dot(X_transformed, self.components_.T)
+        #return X_transformed
+        return np.dot(X, self.components_.T)
+
+    def inverse_transform(self, X):
+        """Find original X from transformed X"""
+        return np.linalg.solve(self.components_, X.T).T
