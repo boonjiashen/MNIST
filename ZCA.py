@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 from scipy import linalg
-from sklearn.utils import array2d, as_float_array
+from sklearn.utils import as_float_array
 from sklearn.base import TransformerMixin, BaseEstimator
 
 
@@ -13,7 +13,7 @@ class ZCA(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
 
-        X = array2d(X)
+        #X = array2d(X)
         X = as_float_array(X, copy = self.copy)
         cov = np.dot(X.T,X) / X.shape[1]
         V, D, _ = np.linalg.svd(cov)  # eigenvalues, eigenvectors
